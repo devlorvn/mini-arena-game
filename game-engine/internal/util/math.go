@@ -16,3 +16,14 @@ func ParseInt(s string) int {
 	fmt.Sscanf(s, "%d", &i)
 	return i
 }
+
+// Helper: clamp value between min and max
+func Clamp(value, min, max float64) float64 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
+}

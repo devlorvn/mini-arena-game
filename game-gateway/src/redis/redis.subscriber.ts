@@ -16,9 +16,9 @@ export class RedisSubscriber implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     try {
-      await this.subscriber.psubscribe('game:snapshot:*');
+      await this.subscriber.psubscribe('room:*:snapshot');
 
-      console.log('Redis subscribed: game:snapshot:*');
+      console.log('Redis subscribed: room:*:snapshot');
 
       this.subscriber.on(
         'pmessage',
@@ -26,7 +26,7 @@ export class RedisSubscriber implements OnModuleInit, OnModuleDestroy {
           try {
             const snapshot = JSON.parse(message);
 
-            console.log(`[SNAPSHOT] room=${snapshot.roomId} tick=${snapshot.tick}`);
+            // console.log(`[SNAPSHOT] room=${snapshot.roomId} tick=${snapshot.tick}`);
 
             this.gameGateway.emitSnapshot(snapshot.roomId, snapshot);
           } catch (error) {
