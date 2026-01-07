@@ -89,25 +89,6 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
   }
 
-  @SubscribeMessage('player:input')
-  async handlePlayerInput(client: Socket, payload: PlayerInputEvent) {
-    try {
-      const playerId = this.playerSession.getPlayerId(client.id);
-      if (!playerId) return;
-
-      const roomId = this.roomSession.getRoomId(playerId);
-      if (!roomId) return;
-
-      await this.redisService.pushGameInput(roomId, {
-        playerId,
-        ...payload,
-        ts: Date.now(),
-      });
-    } catch (error) {
-      console.error('Error handling player input:', error);
-    }
-  }
-
   emitSnapshot(roomId: string, snapshot: any) {
     this.server.to(roomId).emit('game:snapshot', snapshot);
   }

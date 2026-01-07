@@ -49,7 +49,7 @@ func (g *GameEngine) Start(ctx context.Context) error {
 			}
 			g.tickCount++
 			if g.tickCount%60 == 0 {
-				fmt.Printf("Tick count: %d\n", g.tickCount)
+				// fmt.Printf("Tick count: %d\n", g.tickCount)
 			}
 		}
 	}
@@ -161,6 +161,7 @@ func (g *GameEngine) ProcessPlayerInputsForRoom(ctx context.Context, roomId stri
 	// Process up to 10 inputs per tick to avoid input lag
 	for i := 0; i < 10; i++ {
 		result, err := g.redis.RPop(ctx, queueKey).Result()
+		// fmt.Println(result)
 		if err != nil {
 			// Queue is empty, return
 			return nil
