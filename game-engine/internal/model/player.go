@@ -1,8 +1,8 @@
 package model
 
 type Player struct {
-	ID string
-	X  int
-	Y  int
-	HP int
+	ID string  `json:"id"`
+	X  float64 `json:"x"`
+	Y  float64 `json:"y"`
+	HP int     `json:"hp"`
 }
