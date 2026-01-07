@@ -6,10 +6,13 @@ import {
   WebSocketServer,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { v4 as uuid } from 'uuid';
+import { randomUUID } from 'crypto';
 import { PlayerService } from 'src/player/player.service';
 import { RoomService } from 'src/room/room.service';
-import { GAME_EVENTS } from './game.event';
+import { GAME_EVENTS, PlayerInputEvent } from './game.event';
+import { RedisService } from 'src/redis/redis.service';
+import { PlayerSessionService } from 'src/player/player-session.service';
+import { RoomSessionService } from 'src/room/room-session.service';
 
 @WebSocketGateway({
   cors: {
@@ -22,6 +25,9 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
   constructor(
     private playerService: PlayerService,
     private roomService: RoomService,
+    private redisService: RedisService,
+    private playerSession: PlayerSessionService,
+    private roomSession: RoomSessionService,
   ) {}
 
   handleConnection(socket: Socket) {
@@ -30,30 +36,79 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleDisconnect(socket: Socket) {
     console.info(`Client disconnected: ${socket.id}`);
+    
+    // Clean up sessions
+    const playerId = this.playerSession.getPlayerId(socket.id);
+    if (playerId) {
+      this.playerSession.unbind(socket.id);
+      this.roomSession.leave(playerId);
+    }
   }
 
   @SubscribeMessage(GAME_EVENTS.JOIN_ROOM)
   async handleJoinRoom(socket: Socket, payload: { roomId: string }) {
-    const playerId = uuid();
-    socket.data.playerId = playerId;
-    socket.join(payload.roomId);
+    try {
+      const playerId = randomUUID();
+      socket.data.playerId = playerId;
+      socket.join(payload.roomId);
 
-    await this.playerService.createPlayer(playerId);
-    await this.roomService.addPlayer(payload.roomId, playerId);
+      // Bind player session
+      this.playerSession.bind(socket.id, playerId);
+      this.roomSession.join(playerId, payload.roomId);
 
-    socket.emit(GAME_EVENTS.PLAYER_CREATED, { playerId });
+      await this.playerService.createPlayer(playerId);
+      await this.roomService.addPlayer(payload.roomId, playerId);
+
+      socket.emit(GAME_EVENTS.PLAYER_CREATED, { playerId });
+      console.info(`Player ${playerId} joined room ${payload.roomId}`);
+    } catch (error) {
+      console.error('Error joining room:', error);
+      socket.emit('error', { message: 'Failed to join room' });
+    }
   }
 
   @SubscribeMessage(GAME_EVENTS.INPUT)
   async handleInput(socket: Socket, payload: { dx: number; dy: number }) {
-    const playerId = socket.data.playerId;
-    if (!playerId) return;
-    const state = await this.playerService.move(
-      playerId,
-      payload.dx,
-      payload.dy,
-    );
+    try {
+      const playerId = this.playerSession.getPlayerId(socket.id);
+      if (!playerId) return;
 
-    this.server.emit(GAME_EVENTS.PLAYER_MOVED, { playerId, state });
+      const roomId = this.roomSession.getRoomId(playerId);
+      if (!roomId) return;
+
+      // Push to Redis queue for game engine to process
+      await this.redisService.pushGameInput(roomId, {
+        playerId,
+        type: 'MOVE',
+        dx: payload.dx,
+        dy: payload.dy,
+        ts: Date.now(),
+      });
+    } catch (error) {
+      console.error('Error handling input:', error);
+    }
+  }
+
+  @SubscribeMessage('player:input')
+  async handlePlayerInput(client: Socket, payload: PlayerInputEvent) {
+    try {
+      const playerId = this.playerSession.getPlayerId(client.id);
+      if (!playerId) return;
+
+      const roomId = this.roomSession.getRoomId(playerId);
+      if (!roomId) return;
+
+      await this.redisService.pushGameInput(roomId, {
+        playerId,
+        ...payload,
+        ts: Date.now(),
+      });
+    } catch (error) {
+      console.error('Error handling player input:', error);
+    }
+  }
+
+  emitSnapshot(roomId: string, snapshot: any) {
+    this.server.to(roomId).emit('game:snapshot', snapshot);
   }
 }

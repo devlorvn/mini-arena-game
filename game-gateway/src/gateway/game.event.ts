@@ -5,3 +5,9 @@ export const GAME_EVENTS = {
   PLAYER_CREATED: 'player_created',
   INPUT: 'input',
 };
+
+export interface PlayerInputEvent {
+  type: 'MOVE' | 'ATTACK' | 'DEFEND';
+  dx?: number;
+  dy?: number;
+}

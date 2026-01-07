@@ -1,0 +1,18 @@
+FROM node:20-alpine AS base
+
+WORKDIR /app
+
+COPY package*.json ./
+
+FROM base AS development
+RUN npm install
+COPY . .
+EXPOSE 3456
+CMD ["npm", "run", "start:dev"]
+
+FROM base AS production
+RUN npm ci --only=production
+COPY . .
+RUN npm run build
+EXPOSE 3456
+CMD ["node", "dist/main"]
