@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # Redis - Authoritative State Store & Pub/Sub
+  redis:
+    image: redis:7-alpine
+    container_name: redis-game
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - game-network
+
+  # NestJS Gateway - WebSocket Server
+  # gateway:
+  #   build:
+  #     context: ./game-gateway
+  #     dockerfile: Dockerfile
+  #   container_name: game-gateway
+  #   ports:
+  #     - "3456:3456"
+  #   environment:
+  #     - NODE_ENV=development
+  #     - PORT=3456
+  #     - REDIS_HOST=redis
+  #     - REDIS_PORT=6379
+  #     - CORS_ORIGIN=http://localhost:5173
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./game-gateway:/app
+  #     - /app/node_modules
+  #   networks:
+  #     - game-network
+  #   restart: unless-stopped
+
+  # # Go Game Engine
+  # engine:
+  #   build:
+  #     context: ./game-engine
+  #     dockerfile: Dockerfile
+  #   container_name: game-engine
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     - REDIS_HOST=redis
+  #     - REDIS_PORT=6379
+  #     - SERVER_PORT=8080
+  #     - TICK_RATE=60
+  #   depends_on:
+  #     redis:
+  #       condition: service_healthy
+  #   volumes:
+  #     - ./game-engine:/app
+  #   networks:
+  #     - game-network
+  #   restart: unless-stopped
+
+  # # React Client
+  # client:
+  #   build:
+  #     context: ./game-client
+  #     dockerfile: Dockerfile
+  #     target: development
+  #   container_name: game-client
+  #   ports:
+  #     - "5173:5173"
+  #   environment:
+  #     - VITE_GATEWAY_URL=http://localhost:3456
+  #     - VITE_ENGINE_URL=http://localhost:8080
+  #   volumes:
+  #     - ./game-client:/app
+  #     - /app/node_modules
+  #   networks:
+  #     - game-network
+  #   restart: unless-stopped
+
+  # Redis Commander - GUI for Redis
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: redis-commander
+    ports:
+      - "8081:8081"
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+    depends_on:
+      - redis
+    networks:
+      - game-network
+
+volumes:
+  redis-data:
+
+networks:
+  game-network:
+    driver: bridge

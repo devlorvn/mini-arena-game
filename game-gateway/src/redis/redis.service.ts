@@ -4,8 +4,9 @@ import Redis from 'ioredis';
 @Injectable()
 export class RedisService implements OnModuleDestroy {
   private client = new Redis({
-    host: 'localhost',
-    port: 6379,
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT) || 6379,
+    // password: process.env.REDIS_PASSWORD || undefined,
   });
 
   getClient() {
@@ -13,5 +14,9 @@ export class RedisService implements OnModuleDestroy {
   }
   async onModuleDestroy() {
     // Initialization logic for Redis connection can be added here
+  }
+
+  async pushGameInput(roomId: string, payload: any) {
+    await this.client.rpush(`game:input:${roomId}`, JSON.stringify(payload));
   }
 }
