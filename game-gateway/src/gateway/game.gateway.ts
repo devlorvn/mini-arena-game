@@ -13,6 +13,7 @@ import { GAME_EVENTS, PlayerInputEvent } from './game.event';
 import { RedisService } from 'src/redis/redis.service';
 import { PlayerSessionService } from 'src/player/player-session.service';
 import { RoomSessionService } from 'src/room/room-session.service';
+import { PlayerInput } from 'src/shared/player.shared';
 
 @WebSocketGateway({
   cors: {
@@ -36,7 +37,7 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   async handleDisconnect(socket: Socket) {
     console.info(`Client disconnected: ${socket.id}`);
-    
+
     // Clean up sessions
     const playerId = this.playerSession.getPlayerId(socket.id);
     if (playerId) {
@@ -77,13 +78,17 @@ export class GameGateway implements OnGatewayConnection, OnGatewayDisconnect {
       if (!roomId) return;
 
       // Push to Redis queue for game engine to process
-      await this.redisService.pushGameInput(roomId, {
+
+      const data: PlayerInput = {
         playerId,
-        type: 'MOVE',
-        dx: payload.dx,
-        dy: payload.dy,
-        ts: Date.now(),
-      });
+        action: 'MOVE',
+        data: {
+          dx: payload.dx,
+          dy: payload.dy,
+        },
+        timestamp: Date.now(),
+      };
+      await this.redisService.pushGameInput(roomId, data);
     } catch (error) {
       console.error('Error handling input:', error);
     }
