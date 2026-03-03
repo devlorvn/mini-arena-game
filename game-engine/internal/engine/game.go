@@ -49,7 +49,7 @@ func (g *GameEngine) Start(ctx context.Context) error {
 			}
 			g.tickCount++
 			if g.tickCount%60 == 0 {
-				fmt.Printf("Tick count: %d\n", g.tickCount)
+				// fmt.Printf("Tick count: %d\n", g.tickCount)
 			}
 		}
 	}
@@ -157,15 +157,20 @@ func (g *GameEngine) publishGameSnapshot(ctx context.Context, roomId string, pla
 func (g *GameEngine) ProcessPlayerInputsForRoom(ctx context.Context, roomId string) error {
 	queueKey := fmt.Sprintf("game:input:%s", roomId)
 
+	processedCount := 0
 	// Use RPOP (non-blocking) instead of BRPOP for game loop
 	// Process up to 10 inputs per tick to avoid input lag
 	for i := 0; i < 10; i++ {
 		result, err := g.redis.RPop(ctx, queueKey).Result()
 		if err != nil {
 			// Queue is empty, return
+			if processedCount > 0 {
+				fmt.Printf("[INPUT] Processed %d inputs for room %s\n", processedCount, roomId)
+			}
 			return nil
 		}
 
+		processedCount++
 		if err := g.processInput(ctx, result); err != nil {
 			fmt.Printf("Error processing input: %v\n", err)
 		}
@@ -181,10 +186,12 @@ func (g *GameEngine) processInput(ctx context.Context, inputData string) error {
 		return fmt.Errorf("invalid input format: %w", err)
 	}
 
+	fmt.Printf("%+v\n", input)
+
 	switch input.Action {
-	case "move":
+	case "MOVE":
 		return g.processMovement(ctx, &input)
-	case "attack":
+	case "ATTACK":
 		return nil
 	default:
 		return fmt.Errorf("unknown action: %s", input.Action)
@@ -211,6 +218,10 @@ func (g *GameEngine) processMovement(ctx context.Context, input *model.PlayerInp
 
 	newX := currentX + dx
 	newY := currentY + dy
+
+	// 🔍 DEBUG: Log movement calculation
+	fmt.Printf("[MOVEMENT] Player: %s | From: (%.2f, %.2f) | Delta: (%d, %d) | To: (%.2f, %.2f) | Tick: %d\n",
+		input.PlayerId, currentX, currentY, int(dx), int(dy), newX, newY, g.tickCount)
 
 	if err := g.redis.HMSet(ctx, playerKey, map[string]interface{}{
 		"x": newX,

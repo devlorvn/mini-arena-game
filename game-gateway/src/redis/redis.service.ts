@@ -1,5 +1,6 @@
 import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import Redis from 'ioredis';
+import { PlayerInput } from 'src/shared/player.shared';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnModuleDestroy {
@@ -21,7 +22,7 @@ export class RedisService implements OnModuleInit, OnModuleDestroy {
     return this.client;
   }
 
-  async pushGameInput(roomId: string, payload: any) {
+  async pushGameInput(roomId: string, payload: PlayerInput) {
     await this.client.lpush(`game:input:${roomId}`, JSON.stringify(payload));
   }
 
